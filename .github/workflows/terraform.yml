@@ -3,17 +3,21 @@ name: "Terraform"
 on:
   push:
     branches:
-      - main
+      - master
   pull_request:
 
 jobs:
   terraform:
+    strategy:
+      matrix:
+        workspace: [dev, prod]
     name: "Terraform"
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      INFRA_ENV: "dev"
+      WORKSPACE: ${{ matrix.workspace }}
+      TF_VARS_FILE : "./environments/${{ matrix.workspace }}.tfvars"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -37,7 +41,7 @@ jobs:
                 
       - name: Terraform Workspace
         id: workspace
-        run: terraform workspace select $INFRA_ENV
+        run: terraform workspace select $WORKSPACE
       
       - name: Terraform Validate
         id: validate
@@ -46,7 +50,7 @@ jobs:
       - name: Terraform Plan
         id: plan
         if: github.event_name == 'pull_request'
-        run: terraform plan -no-color -input=false  -var-file="./environments/${INFRA_ENV}.tfvars"
+        run: terraform plan -no-color -input=false  -var-file=$TF_VARS_FILE
         continue-on-error: true
 
       - uses: actions/github-script@v6
@@ -83,5 +87,5 @@ jobs:
         run: exit 1
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: terraform apply -auto-approve  -input=false -var-file="./environments/${INFRA_ENV}.tfvars"
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        run: terraform apply -auto-approve  -input=false -var-file=$TF_VARS_FILE
